@@ -51,6 +51,7 @@ jobs:
             ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:latest
           build-args: |
             VITE_AGENT_API_BASE_URL=${{ secrets.VITE_AGENT_API_BASE_URL }}
+            VITE_APPLICATIONINSIGHTS_CONNECTION_STRING=${{ secrets.VITE_APPLICATIONINSIGHTS_CONNECTION_STRING }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

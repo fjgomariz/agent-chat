@@ -11,6 +11,7 @@ A polished React web frontend that implements a classic chat interface (question
 - 📱 **Responsive Design**: Works seamlessly on desktop and mobile devices
 - ⌨️ **Keyboard Shortcuts**: Press Enter to send, Shift+Enter for new line
 - 🔔 **Error Handling**: User-friendly error messages with retry functionality
+- 📊 **Telemetry**: OpenTelemetry integration with Azure Application Insights for distributed tracing
 - 🐳 **Containerized**: Production-ready Docker setup with nginx
 - 🚀 **CI/CD Ready**: GitHub Actions workflow for automated deployment
 
@@ -19,6 +20,7 @@ A polished React web frontend that implements a classic chat interface (question
 - **React 18** with TypeScript
 - **Vite** for fast development and optimized builds
 - **Tailwind CSS** for styling
+- **OpenTelemetry** with Azure Application Insights for distributed tracing
 - **Azure Container Apps** for hosting
 - **Docker** with multi-stage builds
 - **nginx** for serving the SPA
@@ -35,6 +37,7 @@ agent-chat/
 │   │   └── TypingIndicator.tsx   # "Assistant is typing..." indicator
 │   ├── services/
 │   │   └── agentClient.ts        # API client for agent endpoint
+│   ├── telemetry.ts              # OpenTelemetry configuration
 │   ├── types.ts                  # TypeScript type definitions
 │   ├── App.tsx                   # Root application component
 │   └── main.tsx                  # Application entry point
@@ -96,6 +99,7 @@ The application will be available at `http://localhost:5173`
 | Variable | Description | Required | Default |
 |----------|-------------|----------|---------|
 | `VITE_AGENT_API_BASE_URL` | Base URL of the AI Agent API | Yes | - |
+| `VITE_APPLICATIONINSIGHTS_CONNECTION_STRING` | Azure Application Insights connection string for telemetry | No | - |
 
 ### Build-time vs Runtime Configuration
 
@@ -109,6 +113,72 @@ If you need runtime configuration, consider one of these approaches:
 1. Inject the URL through a `config.js` file served by nginx
 2. Use a backend proxy to avoid CORS
 3. Rebuild and redeploy when the API URL changes
+
+## Application Telemetry
+
+The application includes built-in telemetry using **OpenTelemetry** and **Azure Application Insights** for distributed tracing and monitoring.
+
+### Features
+
+- **Automatic HTTP Tracing**: All fetch API calls are automatically instrumented
+- **Request Correlation**: Traces are correlated between frontend and backend using W3C Trace Context headers
+- **Custom Spans**: Chat operations include custom spans with detailed attributes
+- **Error Tracking**: Exceptions and errors are automatically captured
+- **Performance Monitoring**: Request durations and response times are tracked
+
+### Configuration
+
+To enable telemetry, set the Application Insights connection string:
+
+```env
+VITE_APPLICATIONINSIGHTS_CONNECTION_STRING=InstrumentationKey=00000000-0000-0000-0000-000000000000;IngestionEndpoint=https://your-region.in.applicationinsights.azure.com/
+```
+
+**Getting the Connection String:**
+
+1. Go to Azure Portal
+2. Navigate to your Application Insights resource
+3. Click on **Overview** in the left menu
+4. Copy the **Connection String** value
+
+### How It Works
+
+The telemetry system:
+
+1. **Initializes on Startup**: OpenTelemetry is configured in `src/telemetry.ts` and initialized before the React app renders
+2. **Instruments Fetch API**: The `FetchInstrumentation` automatically creates spans for all HTTP requests
+3. **Propagates Context**: W3C Trace Context headers (`traceparent`, `tracestate`) are added to outgoing requests
+4. **Creates Custom Spans**: The `AgentClient` creates custom spans for chat operations with attributes like message length, conversation ID, and streaming status
+5. **Exports to Azure**: Telemetry data is batched and sent to Azure Application Insights
+
+### Viewing Telemetry Data
+
+In Azure Application Insights:
+
+1. **Transaction Search**: View individual requests and traces
+2. **Application Map**: See dependencies and correlations between frontend and backend
+3. **Performance**: Analyze response times and identify bottlenecks
+4. **Failures**: Track errors and exceptions
+5. **Live Metrics**: Monitor real-time telemetry
+
+### Request Correlation
+
+When the frontend calls the backend API, the OpenTelemetry instrumentation automatically:
+
+1. Creates a span for the HTTP request
+2. Generates a unique trace ID and span ID
+3. Adds `traceparent` header to the request: `00-<trace-id>-<span-id>-01`
+4. The backend (if instrumented with OpenTelemetry) reads this header and creates child spans with the same trace ID
+
+This creates a distributed trace that shows the complete request flow from frontend to backend.
+
+### Disabling Telemetry
+
+If you don't want to use telemetry:
+
+1. Simply omit the `VITE_APPLICATIONINSIGHTS_CONNECTION_STRING` environment variable
+2. The application will log a warning and continue without telemetry
+3. No telemetry data will be collected or sent
 
 ## Backend Integration
 
@@ -181,17 +251,18 @@ docker run -p 8080:80 agent-chat-frontend
 
 Access the application at `http://localhost:8080`
 
-### Build with Custom API URL
+### Build with Custom Configuration
 
 Since Vite environment variables are embedded at build time, you must pass them as build arguments:
 
 ```bash
 docker build \
   --build-arg VITE_AGENT_API_BASE_URL=https://your-api.azurecontainerapps.io \
+  --build-arg VITE_APPLICATIONINSIGHTS_CONNECTION_STRING="InstrumentationKey=...;IngestionEndpoint=..." \
   -t agent-chat-frontend .
 ```
 
-**Important**: When deploying to Azure Container Apps, the API URL is baked into the image during the GitHub Actions build step, not set at runtime.
+**Important**: When deploying to Azure Container Apps, environment variables are baked into the image during the GitHub Actions build step, not set at runtime.
 
 ## Deployment to Azure Container Apps
 
@@ -247,6 +318,7 @@ In your GitHub repository, go to Settings > Secrets and variables > Actions, and
 | `RESOURCE_GROUP` | Azure resource group name | `my-resource-group` |
 | `CONTAINER_APP_NAME` | Container app name | `agent-chat-frontend` |
 | `VITE_AGENT_API_BASE_URL` | Agent API base URL | `https://agent-api.azurecontainerapps.io` |
+| `VITE_APPLICATIONINSIGHTS_CONNECTION_STRING` | Application Insights connection string (optional) | `InstrumentationKey=...;IngestionEndpoint=...` |
 
 3. **Deploy**
 
