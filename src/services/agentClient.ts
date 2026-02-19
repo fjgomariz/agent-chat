@@ -56,11 +56,18 @@ export class AgentClient {
 
   /**
    * Send message with SSE streaming
+   * 
+   * NOTE: EventSource does not support custom headers in its constructor.
+   * If authentication is required for streaming endpoints, consider:
+   * 1. Passing auth tokens as query parameters (less secure)
+   * 2. Using cookies for authentication (server must set appropriate CORS)
+   * 3. Implementing a server-side proxy that adds headers
+   * 4. Using fetch with ReadableStream instead of EventSource
    */
   private async sendMessageWithStreaming(
     url: string,
     request: ChatRequest,
-    _headers: Record<string, string>,
+    _headers: Record<string, string>, // Headers cannot be used with EventSource
     onChunk: (chunk: string) => void
   ): Promise<ChatResponse> {
     return new Promise((resolve, reject) => {

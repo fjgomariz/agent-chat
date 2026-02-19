@@ -86,10 +86,10 @@ export const Chat: React.FC = () => {
         }
       );
 
-      // Add assistant message
+      // Add assistant message - use response.answer which contains the full message
       const assistantMessage: Message = {
         role: 'assistant',
-        content: streamingMessage || response.answer,
+        content: response.answer,
         timestamp: new Date(),
       };
 

@@ -16,7 +16,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled = false }
     }
   };
 
-  const handleKeyPress = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -29,7 +29,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled = false }
         <textarea
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          onKeyPress={handleKeyPress}
+          onKeyDown={handleKeyDown}
           placeholder="Type your message..."
           disabled={disabled}
           rows={1}

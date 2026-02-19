@@ -45,6 +45,8 @@ jobs:
           tags: |
             ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
             ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:latest
+          build-args: |
+            VITE_AGENT_API_BASE_URL=${{ secrets.VITE_AGENT_API_BASE_URL }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -54,8 +56,6 @@ jobs:
           resourceGroup: ${{ env.RESOURCE_GROUP }}
           containerAppName: ${{ env.CONTAINER_APP_NAME }}
           imageToDeploy: ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
-          environmentVariables: |
-            VITE_AGENT_API_BASE_URL=${{ secrets.VITE_AGENT_API_BASE_URL }}
 
       - name: Logout from Azure
         if: always()

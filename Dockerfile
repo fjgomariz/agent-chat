@@ -5,6 +5,10 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Accept build arguments for environment variables
+ARG VITE_AGENT_API_BASE_URL
+ENV VITE_AGENT_API_BASE_URL=$VITE_AGENT_API_BASE_URL
+
 # Copy package files
 COPY package*.json ./
 

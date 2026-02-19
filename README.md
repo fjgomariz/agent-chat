@@ -183,11 +183,15 @@ Access the application at `http://localhost:8080`
 
 ### Build with Custom API URL
 
+Since Vite environment variables are embedded at build time, you must pass them as build arguments:
+
 ```bash
 docker build \
   --build-arg VITE_AGENT_API_BASE_URL=https://your-api.azurecontainerapps.io \
   -t agent-chat-frontend .
 ```
+
+**Important**: When deploying to Azure Container Apps, the API URL is baked into the image during the GitHub Actions build step, not set at runtime.
 
 ## Deployment to Azure Container Apps
 
