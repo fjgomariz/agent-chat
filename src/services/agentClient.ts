@@ -1,7 +1,11 @@
 import type { ChatRequest, ChatResponse, SSEEvent } from '../types';
+import { trace, SpanStatusCode } from '@opentelemetry/api';
 
 const DEFAULT_CHAT_ENDPOINT = '/chat';
 const DEFAULT_TIMEOUT = 30000; // 30 seconds
+
+// Get tracer for creating custom spans
+const tracer = trace.getTracer('agent-chat-frontend', '1.0.0');
 
 export class AgentClient {
   private baseUrl: string;
@@ -28,30 +32,63 @@ export class AgentClient {
     request: ChatRequest,
     onChunk?: (chunk: string) => void
   ): Promise<ChatResponse> {
-    const url = `${this.baseUrl}${this.chatEndpoint}`;
+    // Create a custom span for the chat operation
+    return tracer.startActiveSpan('chat.sendMessage', (span) => {
+      // Return the promise from the async operation
+      return (async () => {
+        try {
+          // Add attributes to the span
+          span.setAttribute('chat.conversationId', request.conversationId || 'new');
+          span.setAttribute('chat.messageLength', request.message.length);
+          span.setAttribute('chat.historyLength', request.history.length);
+          span.setAttribute('chat.streaming', !!onChunk);
 
-    // TODO: Add authentication headers here when needed
-    // For API Key authentication:
-    //   headers['X-API-Key'] = 'your-api-key';
-    // For Azure Entra ID (Bearer token):
-    //   headers['Authorization'] = `Bearer ${token}`;
+          const url = `${this.baseUrl}${this.chatEndpoint}`;
 
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
+          // TODO: Add authentication headers here when needed
+          // For API Key authentication:
+          //   headers['X-API-Key'] = 'your-api-key';
+          // For Azure Entra ID (Bearer token):
+          //   headers['Authorization'] = `Bearer ${token}`;
 
-    // Try streaming first if onChunk callback is provided
-    if (onChunk) {
-      try {
-        return await this.sendMessageWithStreaming(url, request, headers, onChunk);
-      } catch (error) {
-        console.warn('Streaming failed, falling back to non-streaming:', error);
-        // Fall back to non-streaming
-      }
-    }
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+          };
 
-    // Non-streaming request
-    return this.sendMessageNonStreaming(url, request, headers);
+          // Try streaming first if onChunk callback is provided
+          if (onChunk) {
+            try {
+              const response = await this.sendMessageWithStreaming(url, request, headers, onChunk);
+              span.setStatus({ code: SpanStatusCode.OK });
+              span.setAttribute('chat.responseLength', response.answer.length);
+              return response;
+            } catch (error) {
+              console.warn('Streaming failed, falling back to non-streaming:', error);
+              span.addEvent('streaming_fallback', {
+                reason: error instanceof Error ? error.message : 'unknown',
+              });
+              // Fall back to non-streaming
+            }
+          }
+
+          // Non-streaming request
+          const response = await this.sendMessageNonStreaming(url, request, headers);
+          span.setStatus({ code: SpanStatusCode.OK });
+          span.setAttribute('chat.responseLength', response.answer.length);
+          return response;
+        } catch (error) {
+          // Record error in span
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: error instanceof Error ? error.message : 'Unknown error',
+          });
+          span.recordException(error as Error);
+          throw error;
+        } finally {
+          span.end();
+        }
+      })();
+    });
   }
 
   /**
