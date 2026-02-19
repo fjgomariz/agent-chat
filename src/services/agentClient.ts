@@ -33,58 +33,61 @@ export class AgentClient {
     onChunk?: (chunk: string) => void
   ): Promise<ChatResponse> {
     // Create a custom span for the chat operation
-    return tracer.startActiveSpan('chat.sendMessage', async (span) => {
-      try {
-        // Add attributes to the span
-        span.setAttribute('chat.conversationId', request.conversationId || 'new');
-        span.setAttribute('chat.messageLength', request.message.length);
-        span.setAttribute('chat.historyLength', request.history.length);
-        span.setAttribute('chat.streaming', !!onChunk);
+    return tracer.startActiveSpan('chat.sendMessage', (span) => {
+      // Return the promise from the async operation
+      return (async () => {
+        try {
+          // Add attributes to the span
+          span.setAttribute('chat.conversationId', request.conversationId || 'new');
+          span.setAttribute('chat.messageLength', request.message.length);
+          span.setAttribute('chat.historyLength', request.history.length);
+          span.setAttribute('chat.streaming', !!onChunk);
 
-        const url = `${this.baseUrl}${this.chatEndpoint}`;
+          const url = `${this.baseUrl}${this.chatEndpoint}`;
 
-        // TODO: Add authentication headers here when needed
-        // For API Key authentication:
-        //   headers['X-API-Key'] = 'your-api-key';
-        // For Azure Entra ID (Bearer token):
-        //   headers['Authorization'] = `Bearer ${token}`;
+          // TODO: Add authentication headers here when needed
+          // For API Key authentication:
+          //   headers['X-API-Key'] = 'your-api-key';
+          // For Azure Entra ID (Bearer token):
+          //   headers['Authorization'] = `Bearer ${token}`;
 
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-        };
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+          };
 
-        // Try streaming first if onChunk callback is provided
-        if (onChunk) {
-          try {
-            const response = await this.sendMessageWithStreaming(url, request, headers, onChunk);
-            span.setStatus({ code: SpanStatusCode.OK });
-            span.setAttribute('chat.responseLength', response.answer.length);
-            return response;
-          } catch (error) {
-            console.warn('Streaming failed, falling back to non-streaming:', error);
-            span.addEvent('streaming_fallback', {
-              reason: error instanceof Error ? error.message : 'unknown',
-            });
-            // Fall back to non-streaming
+          // Try streaming first if onChunk callback is provided
+          if (onChunk) {
+            try {
+              const response = await this.sendMessageWithStreaming(url, request, headers, onChunk);
+              span.setStatus({ code: SpanStatusCode.OK });
+              span.setAttribute('chat.responseLength', response.answer.length);
+              return response;
+            } catch (error) {
+              console.warn('Streaming failed, falling back to non-streaming:', error);
+              span.addEvent('streaming_fallback', {
+                reason: error instanceof Error ? error.message : 'unknown',
+              });
+              // Fall back to non-streaming
+            }
           }
-        }
 
-        // Non-streaming request
-        const response = await this.sendMessageNonStreaming(url, request, headers);
-        span.setStatus({ code: SpanStatusCode.OK });
-        span.setAttribute('chat.responseLength', response.answer.length);
-        return response;
-      } catch (error) {
-        // Record error in span
-        span.setStatus({
-          code: SpanStatusCode.ERROR,
-          message: error instanceof Error ? error.message : 'Unknown error',
-        });
-        span.recordException(error as Error);
-        throw error;
-      } finally {
-        span.end();
-      }
+          // Non-streaming request
+          const response = await this.sendMessageNonStreaming(url, request, headers);
+          span.setStatus({ code: SpanStatusCode.OK });
+          span.setAttribute('chat.responseLength', response.answer.length);
+          return response;
+        } catch (error) {
+          // Record error in span
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: error instanceof Error ? error.message : 'Unknown error',
+          });
+          span.recordException(error as Error);
+          throw error;
+        } finally {
+          span.end();
+        }
+      })();
     });
   }
 

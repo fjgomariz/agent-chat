@@ -50,9 +50,19 @@ export function initializeTelemetry(): void {
     });
 
     // Create the tracer provider with resource and span processor
+    // Configure BatchSpanProcessor with browser-optimized settings:
+    // - scheduledDelayMillis: Export more frequently (5s) to handle browser closures
+    // - maxQueueSize: Smaller queue (100) for memory-constrained browsers
+    // - maxExportBatchSize: Smaller batches (50) for faster exports
     const provider = new WebTracerProvider({
       resource,
-      spanProcessors: [new BatchSpanProcessor(exporter)],
+      spanProcessors: [
+        new BatchSpanProcessor(exporter, {
+          scheduledDelayMillis: 5000,  // Export every 5 seconds
+          maxQueueSize: 100,            // Smaller queue for browsers
+          maxExportBatchSize: 50,       // Smaller batches for faster exports
+        }),
+      ],
     });
 
     // Register the provider globally
