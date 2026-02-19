@@ -74,16 +74,15 @@ export class AgentClient {
 
       let accumulatedAnswer = '';
       let conversationId = '';
-      let timeoutId: ReturnType<typeof setTimeout>;
 
-      const cleanup = () => {
+      const cleanup = (timerId: ReturnType<typeof setTimeout> | undefined) => {
         eventSource.close();
-        if (timeoutId) clearTimeout(timeoutId);
+        if (timerId) clearTimeout(timerId);
       };
 
       // Set timeout
-      timeoutId = setTimeout(() => {
-        cleanup();
+      const timeoutId = setTimeout(() => {
+        cleanup(undefined);
         reject(new Error('Request timeout'));
       }, this.timeout);
 
@@ -92,7 +91,7 @@ export class AgentClient {
           const data: SSEEvent = JSON.parse(event.data);
           
           if (data.error) {
-            cleanup();
+            cleanup(timeoutId);
             reject(new Error(data.error));
             return;
           }
@@ -107,7 +106,7 @@ export class AgentClient {
           }
 
           if (data.done) {
-            cleanup();
+            cleanup(timeoutId);
             resolve({
               conversationId: conversationId || request.conversationId || '',
               answer: accumulatedAnswer,
@@ -119,7 +118,7 @@ export class AgentClient {
       };
 
       eventSource.onerror = () => {
-        cleanup();
+        cleanup(timeoutId);
         reject(new Error('SSE connection error'));
       };
     });
